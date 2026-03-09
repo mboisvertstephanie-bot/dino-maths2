@@ -319,7 +319,7 @@ export default function App() {
 
     window.setTimeout(() => {
       setFeedbackType("idle");
-    }, 550);
+    }, 600);
   }
 
   function getAudioContext() {
@@ -476,7 +476,6 @@ export default function App() {
     setB(result.question.b);
     setAnswer("");
     setShowThinkingPrompt(false);
-    setFeedbackType("idle");
 
     if (nextMode === "practice") {
       clearBossInterval();
@@ -602,13 +601,15 @@ export default function App() {
       }
     }
 
-    askNewQuestion(
-      selectedTables,
-      mode,
-      nextWeakFacts,
-      operation,
-      currentBoss
-    );
+    window.setTimeout(() => {
+      askNewQuestion(
+        selectedTables,
+        mode,
+        nextWeakFacts,
+        operation,
+        currentBoss
+      );
+    }, 650);
   }
 
   function continueAfterBossVictory() {
