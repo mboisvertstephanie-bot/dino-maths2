@@ -5,13 +5,22 @@ function randomFromArray(arr) {
 }
 
 function getFactKey(a, b, operation) {
-  return `${operation}:${a}x${b}`;
+  return `${operation}:${a}|${b}`;
 }
 
 function formatQuestion(a, b, operation) {
   if (operation === "division") {
     return `${a * b} ÷ ${a}`;
   }
+
+  if (operation === "subtraction") {
+    return `${a + b} − ${a}`;
+  }
+
+  if (operation === "addition") {
+    return `${a} + ${b}`;
+  }
+
   return `${a} × ${b}`;
 }
 
@@ -19,15 +28,32 @@ function getCorrectAnswer(a, b, operation) {
   if (operation === "division") {
     return b;
   }
+
+  if (operation === "subtraction") {
+    return b;
+  }
+
+  if (operation === "addition") {
+    return a + b;
+  }
+
   return a * b;
 }
 
 function formatWeakFactLabel(key) {
   const [operation, fact] = key.split(":");
-  const [a, b] = fact.split("x").map(Number);
+  const [a, b] = fact.split("|").map(Number);
 
   if (operation === "division") {
     return `${a * b} ÷ ${a}`;
+  }
+
+  if (operation === "subtraction") {
+    return `${a + b} − ${a}`;
+  }
+
+  if (operation === "addition") {
+    return `${a} + ${b}`;
   }
 
   return `${a} × ${b}`;
@@ -37,8 +63,8 @@ function pickWeightedQuestion(selectedTables, weakFacts, mode, operation) {
   const pool = [];
 
   selectedTables.forEach((table) => {
-    for (let multiplier = 1; multiplier <= 10; multiplier++) {
-      const key = getFactKey(table, multiplier, operation);
+    for (let secondNumber = 1; secondNumber <= 10; secondNumber++) {
+      const key = getFactKey(table, secondNumber, operation);
       const stats = weakFacts[key] || { right: 0, wrong: 0 };
 
       let weight = 1;
@@ -53,7 +79,12 @@ function pickWeightedQuestion(selectedTables, weakFacts, mode, operation) {
       weight = Math.max(1, Math.round(weight));
 
       for (let i = 0; i < weight; i++) {
-        pool.push({ a: table, b: multiplier, key, operation });
+        pool.push({
+          a: table,
+          b: secondNumber,
+          key,
+          operation,
+        });
       }
     }
   });
@@ -634,6 +665,8 @@ export default function App() {
               {[
                 { key: "multiplication", label: "Multiplication" },
                 { key: "division", label: "Division" },
+                { key: "addition", label: "Addition" },
+                { key: "subtraction", label: "Soustraction" },
               ].map((item) => (
                 <button
                   key={item.key}
@@ -918,7 +951,13 @@ export default function App() {
               }}
             >
               {mode === "practice" ? "Mode pratique" : "Mode combat de boss"} ·{" "}
-              {operation === "multiplication" ? "Multiplication" : "Division"}
+              {operation === "multiplication"
+                ? "Multiplication"
+                : operation === "division"
+                ? "Division"
+                : operation === "addition"
+                ? "Addition"
+                : "Soustraction"}
             </div>
 
             <h2
