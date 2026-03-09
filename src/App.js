@@ -67,11 +67,19 @@ function pickWeightedQuestion(selectedTables, weakFacts, mode, operation) {
 function getBossProfile(bossWins) {
   const bosses = [
     {
-      name: "Vélo-Raptor",
+      name: "Compsognathus",
       min: 0,
       icon: "🦖",
       size: "Petit boss",
       maxHealth: 8,
+      timeLimit: 10,
+    },
+    {
+      name: "Véloci-Rapide",
+      min: 1,
+      icon: "💨",
+      size: "Boss agile",
+      maxHealth: 9,
       timeLimit: 10,
     },
     {
@@ -83,11 +91,27 @@ function getBossProfile(bossWins) {
       timeLimit: 9,
     },
     {
+      name: "Ankylo-Choc",
+      min: 3,
+      icon: "🛡️",
+      size: "Boss blindé",
+      maxHealth: 11,
+      timeLimit: 9,
+    },
+    {
       name: "Stégo-Tonnerre",
       min: 4,
       icon: "⚡",
       size: "Boss géant",
       maxHealth: 12,
+      timeLimit: 8,
+    },
+    {
+      name: "Dilopho-Danger",
+      min: 5,
+      icon: "☠️",
+      size: "Boss sournois",
+      maxHealth: 13,
       timeLimit: 8,
     },
     {
@@ -99,11 +123,27 @@ function getBossProfile(bossWins) {
       timeLimit: 7,
     },
     {
+      name: "Carnotank",
+      min: 7,
+      icon: "💢",
+      size: "Boss brutal",
+      maxHealth: 15,
+      timeLimit: 7,
+    },
+    {
       name: "Tyranno Max",
       min: 8,
       icon: "☄️",
       size: "Boss titan",
       maxHealth: 16,
+      timeLimit: 6,
+    },
+    {
+      name: "Méga Raptor X",
+      min: 9,
+      icon: "🌪️",
+      size: "Boss féroce",
+      maxHealth: 17,
       timeLimit: 6,
     },
     {
@@ -113,6 +153,22 @@ function getBossProfile(bossWins) {
       size: "Boss légendaire",
       maxHealth: 18,
       timeLimit: 5,
+    },
+    {
+      name: "Roi des Dinos",
+      min: 11,
+      icon: "👑",
+      size: "Boss ultime",
+      maxHealth: 20,
+      timeLimit: 4,
+    },
+    {
+      name: "Empereur Jurassique",
+      min: 12,
+      icon: "💀",
+      size: "Boss mythique",
+      maxHealth: 22,
+      timeLimit: 3,
     },
   ];
 
@@ -149,7 +205,7 @@ function getEggStage(level) {
   if (level <= 8) {
     return {
       icon: "🦖",
-      name: "Jeune dino",
+      name: "Dilophosaure",
       text: "Ton dino grandit vite. Il devient solide.",
     };
   }
@@ -157,14 +213,14 @@ function getEggStage(level) {
   if (level <= 11) {
     return {
       icon: "🦕",
-      name: "Dino puissant",
+      name: "T-REX (raWwwr)",
       text: "Ton compagnon dino est maintenant très fort.",
     };
   }
 
   return {
     icon: "👑🦖",
-    name: "Dino légendaire",
+    name: "Distoripus REXXXXX",
     text: "Ton dino est devenu une légende du Jurassique.",
   };
 }
