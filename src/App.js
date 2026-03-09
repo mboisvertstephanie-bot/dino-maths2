@@ -4,16 +4,36 @@ function randomFromArray(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function getFactKey(a, b) {
-  return `${a}x${b}`;
+function getFactKey(a, b, operation) {
+  return `${operation}:${a}x${b}`;
 }
 
-function pickWeightedQuestion(selectedTables, weakFacts, mode, skipQueue = []) {
+function formatQuestion(a, b, operation) {
+  if (operation === "division") {
+    return `${a * b} ÷ ${a}`;
+  }
+  return `${a} × ${b}`;
+}
+
+function getCorrectAnswer(a, b, operation) {
+  if (operation === "division") {
+    return b;
+  }
+  return a * b;
+}
+
+function pickWeightedQuestion(
+  selectedTables,
+  weakFacts,
+  mode,
+  operation,
+  skipQueue = []
+) {
   const pool = [];
 
   selectedTables.forEach((table) => {
     for (let multiplier = 1; multiplier <= 10; multiplier++) {
-      const key = getFactKey(table, multiplier);
+      const key = getFactKey(table, multiplier, operation);
       const stats = weakFacts[key] || { right: 0, wrong: 0 };
 
       let weight = 1;
@@ -28,7 +48,7 @@ function pickWeightedQuestion(selectedTables, weakFacts, mode, skipQueue = []) {
       weight = Math.max(1, Math.round(weight));
 
       for (let i = 0; i < weight; i++) {
-        pool.push({ a: table, b: multiplier, key });
+        pool.push({ a: table, b: multiplier, key, operation });
       }
     }
   });
@@ -153,6 +173,8 @@ function getEggStage(level) {
 
 export default function App() {
   const [selectedTables, setSelectedTables] = useState([2, 3, 4, 5]);
+  const [operation, setOperation] = useState("multiplication");
+
   const [a, setA] = useState(2);
   const [b, setB] = useState(3);
   const [answer, setAnswer] = useState("");
@@ -223,6 +245,7 @@ export default function App() {
               selectedTables,
               "boss",
               weakFacts,
+              operation,
               skipQueue,
               bossProfileOverride
             );
@@ -240,6 +263,7 @@ export default function App() {
     nextTables = selectedTables,
     nextMode = mode,
     nextWeakFacts = weakFacts,
+    nextOperation = operation,
     nextSkipQueue = skipQueue,
     bossProfileOverride = currentBoss
   ) {
@@ -247,6 +271,7 @@ export default function App() {
       nextTables,
       nextWeakFacts,
       nextMode,
+      nextOperation,
       nextSkipQueue
     );
 
@@ -281,7 +306,7 @@ export default function App() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [a, b, mode]);
+  }, [a, b, mode, operation]);
 
   useEffect(() => {
     if (mode === "boss" && !showBossVictory && gameStarted) {
@@ -311,7 +336,7 @@ export default function App() {
   }
 
   function buildNextWeakFacts(correct) {
-    const key = getFactKey(a, b);
+    const key = getFactKey(a, b, operation);
     const current = weakFacts[key] || { right: 0, wrong: 0 };
 
     return {
@@ -324,7 +349,8 @@ export default function App() {
   }
 
   function checkAnswer() {
-    const correct = parseInt(answer, 10) === a * b;
+    const expected = getCorrectAnswer(a, b, operation);
+    const correct = parseInt(answer, 10) === expected;
 
     setAttempts((prev) => prev + 1);
     setShowThinkingPrompt(false);
@@ -358,7 +384,7 @@ export default function App() {
         } else {
           setBossHealth(nextHealth);
           setMessage(
-            `Touché ! ${currentBoss.name} perd ${damage} points de vie.`
+            `Touché ! ${currentBoss.name} perd ${damage} point de vie.`
           );
         }
       } else {
@@ -371,27 +397,44 @@ export default function App() {
         const healed = Math.min(currentBoss.maxHealth, bossHealth + 1);
         setBossHealth(healed);
         setMessage(
-          `Oups ! La bonne réponse était ${a * b}. ${
-            currentBoss.name
-          } regagne 1 point de vie.`
+          `Oups ! La bonne réponse était ${expected}. ${currentBoss.name} regagne 1 point de vie.`
         );
       } else {
-        setMessage(`Oups ! La bonne réponse était ${a * b}.`);
+        setMessage(`Oups ! La bonne réponse était ${expected}.`);
       }
     }
 
-    askNewQuestion(selectedTables, mode, nextWeakFacts, skipQueue, currentBoss);
+    askNewQuestion(
+      selectedTables,
+      mode,
+      nextWeakFacts,
+      operation,
+      skipQueue,
+      currentBoss
+    );
   }
 
   function handlePass() {
     if (mode === "practice") {
-      askNewQuestion(selectedTables, mode, weakFacts, skipQueue, currentBoss);
+      askNewQuestion(
+        selectedTables,
+        mode,
+        weakFacts,
+        operation,
+        skipQueue,
+        currentBoss
+      );
       return;
     }
 
     if (passesLeft <= 0) return;
 
-    const questionToRequeue = { a, b, key: getFactKey(a, b) };
+    const questionToRequeue = {
+      a,
+      b,
+      key: getFactKey(a, b, operation),
+      operation,
+    };
     const updatedQueue = [...skipQueue, questionToRequeue];
 
     setSkipQueue(updatedQueue);
@@ -401,6 +444,7 @@ export default function App() {
       selectedTables,
       "boss",
       weakFacts,
+      operation,
       updatedQueue,
       currentBoss
     );
@@ -415,7 +459,7 @@ export default function App() {
     setBossTimer(nextBoss.timeLimit);
     setPassesLeft(3);
     setSkipQueue([]);
-    askNewQuestion(selectedTables, "boss", weakFacts, [], nextBoss);
+    askNewQuestion(selectedTables, "boss", weakFacts, operation, [], nextBoss);
   }
 
   function switchMode(newMode) {
@@ -440,12 +484,19 @@ export default function App() {
       setPassesLeft(3);
       setSkipQueue([]);
       window.setTimeout(() => {
-        askNewQuestion(selectedTables, "boss", weakFacts, [], boss);
+        askNewQuestion(selectedTables, "boss", weakFacts, operation, [], boss);
       }, 0);
     } else {
       clearBossInterval();
       window.setTimeout(() => {
-        askNewQuestion(selectedTables, "practice", weakFacts, [], currentBoss);
+        askNewQuestion(
+          selectedTables,
+          "practice",
+          weakFacts,
+          operation,
+          [],
+          currentBoss
+        );
       }, 0);
     }
   }
@@ -510,7 +561,7 @@ export default function App() {
           </h1>
 
           <p style={{ color: "#6b21a8", marginTop: 0, marginBottom: 20 }}>
-            Choisis tes tables et ton mode de jeu avant de commencer.
+            Choisis tes tables, ton type de calcul et ton mode de jeu.
           </p>
 
           <div
@@ -553,6 +604,50 @@ export default function App() {
                   }}
                 >
                   {table}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: "#faf5ff",
+              padding: isMobile ? 16 : 20,
+              borderRadius: 24,
+              border: "2px solid #e9d5ff",
+              marginBottom: 16,
+            }}
+          >
+            <h3 style={{ color: "#5b21b6", marginTop: 0, marginBottom: 8 }}>
+              Type de calcul
+            </h3>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              {[
+                { key: "multiplication", label: "Multiplication" },
+                { key: "division", label: "Division" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setOperation(item.key)}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "2px solid #e9d5ff",
+                    background: operation === item.key ? "#7c3aed" : "#ffffff",
+                    color: operation === item.key ? "#ffffff" : "#4c1d95",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    minHeight: 44,
+                  }}
+                >
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -820,7 +915,8 @@ export default function App() {
                 fontWeight: "bold",
               }}
             >
-              {mode === "practice" ? "Mode pratique" : "Mode combat de boss"}
+              {mode === "practice" ? "Mode pratique" : "Mode combat de boss"} ·{" "}
+              {operation === "multiplication" ? "Multiplication" : "Division"}
             </div>
 
             <h2
@@ -831,7 +927,7 @@ export default function App() {
                 marginBottom: 16,
               }}
             >
-              {a} × {b} = ?
+              {formatQuestion(a, b, operation)} = ?
             </h2>
 
             <input
@@ -973,7 +1069,9 @@ export default function App() {
                   }}
                 >
                   <strong style={{ color: "#4c1d95" }}>
-                    {item.key.replace("x", " × ")}
+                    {item.key
+                      .replace("multiplication:", "× ")
+                      .replace("division:", "÷ ")}
                   </strong>
                   <div style={{ color: "#6b21a8", marginTop: 4 }}>
                     Erreurs : {item.wrong} · Réussites : {item.right}
