@@ -22,13 +22,18 @@ function getCorrectAnswer(a, b, operation) {
   return a * b;
 }
 
-function pickWeightedQuestion(
-  selectedTables,
-  weakFacts,
-  mode,
-  operation,
-  skipQueue = []
-) {
+function formatWeakFactLabel(key) {
+  const [operation, fact] = key.split(":");
+  const [a, b] = fact.split("x").map(Number);
+
+  if (operation === "division") {
+    return `${a * b} ÷ ${a}`;
+  }
+
+  return `${a} × ${b}`;
+}
+
+function pickWeightedQuestion(selectedTables, weakFacts, mode, operation) {
   const pool = [];
 
   selectedTables.forEach((table) => {
@@ -52,13 +57,6 @@ function pickWeightedQuestion(
       }
     }
   });
-
-  if (skipQueue.length > 0) {
-    return {
-      question: skipQueue[0],
-      usedSkipQueue: true,
-    };
-  }
 
   return {
     question: randomFromArray(pool),
@@ -192,8 +190,6 @@ export default function App() {
 
   const [bossHealth, setBossHealth] = useState(getBossProfile(0).maxHealth);
   const [bossTimer, setBossTimer] = useState(getBossProfile(0).timeLimit);
-  const [passesLeft, setPassesLeft] = useState(3);
-  const [skipQueue, setSkipQueue] = useState([]);
 
   const [showBossVictory, setShowBossVictory] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
@@ -246,7 +242,6 @@ export default function App() {
               "boss",
               weakFacts,
               operation,
-              skipQueue,
               bossProfileOverride
             );
           }, 250);
@@ -264,15 +259,13 @@ export default function App() {
     nextMode = mode,
     nextWeakFacts = weakFacts,
     nextOperation = operation,
-    nextSkipQueue = skipQueue,
     bossProfileOverride = currentBoss
   ) {
     const result = pickWeightedQuestion(
       nextTables,
       nextWeakFacts,
       nextMode,
-      nextOperation,
-      nextSkipQueue
+      nextOperation
     );
 
     setA(result.question.a);
@@ -285,9 +278,6 @@ export default function App() {
     }
 
     if (nextMode === "boss") {
-      if (result.usedSkipQueue) {
-        setSkipQueue((prev) => prev.slice(1));
-      }
       startBossTimer(bossProfileOverride.timeLimit, bossProfileOverride);
     }
   }
@@ -312,8 +302,6 @@ export default function App() {
     if (mode === "boss" && !showBossVictory && gameStarted) {
       setBossHealth(currentBoss.maxHealth);
       setBossTimer(currentBoss.timeLimit);
-      setPassesLeft(3);
-      setSkipQueue([]);
       clearBossInterval();
       startBossTimer(currentBoss.timeLimit, currentBoss);
     } else {
@@ -394,10 +382,10 @@ export default function App() {
       setStreak(0);
 
       if (mode === "boss") {
-        const healed = Math.min(currentBoss.maxHealth, bossHealth + 1);
+        const healed = Math.min(currentBoss.maxHealth, bossHealth + 2);
         setBossHealth(healed);
         setMessage(
-          `Oups ! La bonne réponse était ${expected}. ${currentBoss.name} regagne 1 point de vie.`
+          `Oups ! La bonne réponse était ${expected}. ${currentBoss.name} regagne 2 points de vie.`
         );
       } else {
         setMessage(`Oups ! La bonne réponse était ${expected}.`);
@@ -409,43 +397,6 @@ export default function App() {
       mode,
       nextWeakFacts,
       operation,
-      skipQueue,
-      currentBoss
-    );
-  }
-
-  function handlePass() {
-    if (mode === "practice") {
-      askNewQuestion(
-        selectedTables,
-        mode,
-        weakFacts,
-        operation,
-        skipQueue,
-        currentBoss
-      );
-      return;
-    }
-
-    if (passesLeft <= 0) return;
-
-    const questionToRequeue = {
-      a,
-      b,
-      key: getFactKey(a, b, operation),
-      operation,
-    };
-    const updatedQueue = [...skipQueue, questionToRequeue];
-
-    setSkipQueue(updatedQueue);
-    setPassesLeft((prev) => prev - 1);
-    setMessage("Question passée. Elle reviendra plus tard.");
-    askNewQuestion(
-      selectedTables,
-      "boss",
-      weakFacts,
-      operation,
-      updatedQueue,
       currentBoss
     );
   }
@@ -457,9 +408,7 @@ export default function App() {
     setMessage("Super ! Tu passes au prochain boss 🦖");
     setBossHealth(nextBoss.maxHealth);
     setBossTimer(nextBoss.timeLimit);
-    setPassesLeft(3);
-    setSkipQueue([]);
-    askNewQuestion(selectedTables, "boss", weakFacts, operation, [], nextBoss);
+    askNewQuestion(selectedTables, "boss", weakFacts, operation, nextBoss);
   }
 
   function switchMode(newMode) {
@@ -481,10 +430,8 @@ export default function App() {
       const boss = getBossProfile(bossWins);
       setBossHealth(boss.maxHealth);
       setBossTimer(boss.timeLimit);
-      setPassesLeft(3);
-      setSkipQueue([]);
       window.setTimeout(() => {
-        askNewQuestion(selectedTables, "boss", weakFacts, operation, [], boss);
+        askNewQuestion(selectedTables, "boss", weakFacts, operation, boss);
       }, 0);
     } else {
       clearBossInterval();
@@ -494,7 +441,6 @@ export default function App() {
           "practice",
           weakFacts,
           operation,
-          [],
           currentBoss
         );
       }, 0);
@@ -872,7 +818,7 @@ export default function App() {
                     fontSize: isMobile ? 14 : 16,
                   }}
                 >
-                  Temps restant : {bossTimer}s · Passes restantes : {passesLeft}/3
+                  Temps restant : {bossTimer}s
                 </div>
 
                 <div
@@ -974,31 +920,6 @@ export default function App() {
               >
                 {mode === "boss" ? "Attaquer" : "Vérifier"}
               </button>
-
-              <button
-                onClick={handlePass}
-                disabled={mode === "boss" && passesLeft <= 0}
-                style={{
-                  padding: "10px 18px",
-                  borderRadius: 12,
-                  border: "2px solid #e9d5ff",
-                  background:
-                    mode === "boss" && passesLeft <= 0 ? "#f3f4f6" : "#ffffff",
-                  color:
-                    mode === "boss" && passesLeft <= 0
-                      ? "#9ca3af"
-                      : "#4c1d95",
-                  cursor:
-                    mode === "boss" && passesLeft <= 0
-                      ? "not-allowed"
-                      : "pointer",
-                  fontWeight: "bold",
-                  width: isMobile ? "100%" : "auto",
-                  minHeight: 48,
-                }}
-              >
-                Passer
-              </button>
             </div>
 
             {showThinkingPrompt && mode === "practice" && (
@@ -1069,9 +990,7 @@ export default function App() {
                   }}
                 >
                   <strong style={{ color: "#4c1d95" }}>
-                    {item.key
-                      .replace("multiplication:", "× ")
-                      .replace("division:", "÷ ")}
+                    {formatWeakFactLabel(item.key)}
                   </strong>
                   <div style={{ color: "#6b21a8", marginTop: 4 }}>
                     Erreurs : {item.wrong} · Réussites : {item.right}
