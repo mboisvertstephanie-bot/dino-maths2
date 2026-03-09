@@ -175,6 +175,7 @@ export default function App() {
 
   const [showBossVictory, setShowBossVictory] = useState(false);
   const [defeatedBossName, setDefeatedBossName] = useState("");
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
   const timerRef = useRef(null);
 
@@ -182,6 +183,15 @@ export default function App() {
   const xpInLevel = xp % 100;
   const currentBoss = getBossProfile(bossWins);
   const eggStage = getEggStage(level);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 768);
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   function clearBossInterval() {
     if (timerRef.current) {
@@ -464,320 +474,396 @@ export default function App() {
         fontFamily: "Arial, sans-serif",
         maxWidth: 1000,
         margin: "0 auto",
-        padding: 30,
         background: "#fffdf3",
-        minHeight: "100vh",
+        minHeight: "100svh",
         color: "#4c1d95",
       }}
     >
-      <h1 style={{ color: "#6d28d9", marginBottom: 6 }}>
-        🦖 Mission Dino-Maths
-      </h1>
-      <p style={{ color: "#6b21a8" }}>
-        Explore, réfléchis et bats des dinosaures de plus en plus énormes.
-      </p>
-
-      <div style={{ marginBottom: 20 }}>
-        <h3 style={{ color: "#5b21b6" }}>Choisir les tables</h3>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((table) => (
-          <button
-            key={table}
-            onClick={() => toggleTable(table)}
-            style={{
-              margin: 4,
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "2px solid #e9d5ff",
-              background: selectedTables.includes(table)
-                ? "#7c3aed"
-                : "#ffffff",
-              color: selectedTables.includes(table) ? "#ffffff" : "#4c1d95",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            {table}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <h3 style={{ color: "#5b21b6" }}>Mode d’aventure</h3>
-        {[
-          { key: "practice", label: "Pratique" },
-          { key: "boss", label: "Combat de boss" },
-        ].map((item) => (
-          <button
-            key={item.key}
-            onClick={() => switchMode(item.key)}
-            style={{
-              marginRight: 8,
-              marginBottom: 8,
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "2px solid #e9d5ff",
-              background: mode === item.key ? "#7c3aed" : "#ffffff",
-              color: mode === item.key ? "#ffffff" : "#4c1d95",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
       <div
         style={{
-          background: "#fff7cc",
-          padding: 20,
-          borderRadius: 24,
-          marginBottom: 20,
-          border: "2px solid #fde047",
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          background: "#fffdf3",
+          padding: isMobile ? "10px 10px 8px" : "20px 20px 12px",
+          borderBottom: "1px solid #f3e8ff",
         }}
       >
-        <h3 style={{ color: "#713f12", marginTop: 0 }}>Œuf de dinosaure</h3>
-        <p
+        <h1
           style={{
-            fontSize: 34,
-            fontWeight: "bold",
-            margin: "6px 0",
-            color: "#5b21b6",
+            color: "#6d28d9",
+            marginBottom: 6,
+            marginTop: 0,
+            fontSize: isMobile ? 28 : 32,
           }}
         >
-          {eggStage.icon} {eggStage.name}
-        </p>
-        <p style={{ margin: 0, color: "#7c2d12", fontWeight: "bold" }}>
-          {eggStage.text}
-        </p>
-      </div>
+          🦖 Mission Dino-Maths
+        </h1>
 
-      <div
-        style={{
-          background: "#fff7cc",
-          padding: 20,
-          borderRadius: 24,
-          marginBottom: 20,
-          border: "2px solid #fde047",
-        }}
-      >
-        <h3 style={{ color: "#713f12", marginTop: 0 }}>
-          Boss dinosaure actuel
-        </h3>
-        <p
-          style={{
-            fontSize: 30,
-            fontWeight: "bold",
-            margin: "6px 0",
-            color: "#5b21b6",
-          }}
-        >
-          {currentBoss.icon} {currentBoss.name}
-        </p>
-        <p
-          style={{ margin: "0 0 10px 0", color: "#7c2d12", fontWeight: "bold" }}
-        >
-          {currentBoss.size} · Dinos vaincus : {bossWins}
+        <p style={{ color: "#6b21a8", marginTop: 0 }}>
+          Explore, réfléchis et bats des dinosaures de plus en plus énormes.
         </p>
 
-        <div style={{ marginBottom: 8, color: "#713f12", fontWeight: "bold" }}>
-          Vie du boss : {bossHealth}/{currentBoss.maxHealth}
+        <div style={{ marginBottom: 14 }}>
+          <h3 style={{ color: "#5b21b6", marginBottom: 8 }}>Choisir les tables</h3>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((table) => (
+              <button
+                key={table}
+                onClick={() => toggleTable(table)}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: "2px solid #e9d5ff",
+                  background: selectedTables.includes(table)
+                    ? "#7c3aed"
+                    : "#ffffff",
+                  color: selectedTables.includes(table) ? "#ffffff" : "#4c1d95",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  minHeight: 44,
+                }}
+              >
+                {table}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <h3 style={{ color: "#5b21b6", marginBottom: 8 }}>Mode d’aventure</h3>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            {[
+              { key: "practice", label: "Pratique" },
+              { key: "boss", label: "Combat de boss" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => switchMode(item.key)}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: "2px solid #e9d5ff",
+                  background: mode === item.key ? "#7c3aed" : "#ffffff",
+                  color: mode === item.key ? "#ffffff" : "#4c1d95",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  minHeight: 44,
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div
           style={{
-            width: "100%",
-            height: 22,
-            background: "#fde68a",
-            borderRadius: 999,
-            overflow: "hidden",
-            border: "2px solid #facc15",
-            marginBottom: mode === "boss" ? 12 : 0,
+            background: "#fff7cc",
+            padding: isMobile ? 14 : 20,
+            borderRadius: 24,
+            marginBottom: 12,
+            border: "2px solid #fde047",
           }}
         >
-          <div
+          <h3 style={{ color: "#713f12", marginTop: 0, marginBottom: 8 }}>
+            Œuf de dinosaure
+          </h3>
+          <p
             style={{
-              width: `${bossHealthPercent}%`,
-              height: "100%",
-              background: "linear-gradient(90deg, #7c3aed, #c084fc)",
-              transition: "width 0.3s ease",
+              fontSize: isMobile ? 28 : 34,
+              fontWeight: "bold",
+              margin: "6px 0",
+              color: "#5b21b6",
             }}
-          />
+          >
+            {eggStage.icon} {eggStage.name}
+          </p>
+          <p style={{ margin: 0, color: "#7c2d12", fontWeight: "bold" }}>
+            {eggStage.text}
+          </p>
         </div>
 
-        {mode === "boss" && (
-          <>
-            <div
-              style={{ marginBottom: 8, color: "#713f12", fontWeight: "bold" }}
-            >
-              Temps restant : {bossTimer}s · Passes restantes : {passesLeft}/3
-            </div>
+        <div
+          style={{
+            background: "#fff7cc",
+            padding: isMobile ? 14 : 20,
+            borderRadius: 24,
+            border: "2px solid #fde047",
+          }}
+        >
+          <h3 style={{ color: "#713f12", marginTop: 0, marginBottom: 8 }}>
+            Boss dinosaure actuel
+          </h3>
 
+          <p
+            style={{
+              fontSize: isMobile ? 24 : 30,
+              fontWeight: "bold",
+              margin: "6px 0",
+              color: "#5b21b6",
+            }}
+          >
+            {currentBoss.icon} {currentBoss.name}
+          </p>
+
+          <p
+            style={{
+              margin: "0 0 10px 0",
+              color: "#7c2d12",
+              fontWeight: "bold",
+            }}
+          >
+            {currentBoss.size} · Dinos vaincus : {bossWins}
+          </p>
+
+          <div style={{ marginBottom: 8, color: "#713f12", fontWeight: "bold" }}>
+            Vie du boss : {bossHealth}/{currentBoss.maxHealth}
+          </div>
+
+          <div
+            style={{
+              width: "100%",
+              height: 22,
+              background: "#fde68a",
+              borderRadius: 999,
+              overflow: "hidden",
+              border: "2px solid #facc15",
+              marginBottom: mode === "boss" ? 12 : 0,
+            }}
+          >
             <div
               style={{
-                width: "100%",
-                height: 18,
-                background: "#ede9fe",
-                borderRadius: 999,
-                overflow: "hidden",
-                border: "2px solid #c4b5fd",
+                width: `${bossHealthPercent}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, #7c3aed, #c084fc)",
+                transition: "width 0.3s ease",
               }}
-            >
+            />
+          </div>
+
+          {mode === "boss" && (
+            <>
               <div
                 style={{
-                  width: `${bossTimePercent}%`,
-                  height: "100%",
-                  background: "linear-gradient(90deg, #facc15, #7c3aed)",
-                  transition: "width 1s linear",
+                  marginBottom: 8,
+                  color: "#713f12",
+                  fontWeight: "bold",
+                  fontSize: isMobile ? 14 : 16,
                 }}
-              />
-            </div>
-          </>
-        )}
+              >
+                Temps restant : {bossTimer}s · Passes restantes : {passesLeft}/3
+              </div>
+
+              <div
+                style={{
+                  width: "100%",
+                  height: 18,
+                  background: "#ede9fe",
+                  borderRadius: 999,
+                  overflow: "hidden",
+                  border: "2px solid #c4b5fd",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${bossTimePercent}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, #facc15, #7c3aed)",
+                    transition: "width 1s linear",
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div
         style={{
-          background: "#faf5ff",
-          padding: 25,
-          borderRadius: 24,
-          marginBottom: 20,
-          border: "2px solid #e9d5ff",
-          boxShadow: "0 8px 24px rgba(124,58,237,0.08)",
+          padding: isMobile ? 10 : 20,
         }}
       >
-        <div style={{ marginBottom: 10, color: "#7e22ce", fontWeight: "bold" }}>
-          {mode === "practice" ? "Mode pratique" : "Mode combat de boss"}
-        </div>
-
-        <h2 style={{ fontSize: 42, color: "#4c1d95" }}>
-          {a} × {b} = ?
-        </h2>
-
-        <input
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") checkAnswer();
-          }}
+        <div
           style={{
-            fontSize: 22,
-            padding: 10,
-            borderRadius: 12,
-            border: "2px solid #d8b4fe",
-            width: 160,
-            color: "#4c1d95",
+            background: "#faf5ff",
+            padding: isMobile ? 16 : 25,
+            borderRadius: 24,
+            marginBottom: 20,
+            border: "2px solid #e9d5ff",
+            boxShadow: "0 8px 24px rgba(124,58,237,0.08)",
           }}
-        />
+        >
+          <div style={{ marginBottom: 10, color: "#7e22ce", fontWeight: "bold" }}>
+            {mode === "practice" ? "Mode pratique" : "Mode combat de boss"}
+          </div>
 
-        <div style={{ marginTop: 14 }}>
-          <button
-            onClick={checkAnswer}
+          <h2
             style={{
-              padding: "10px 18px",
-              borderRadius: 12,
-              border: "none",
-              background: "#7c3aed",
-              color: "white",
-              cursor: "pointer",
-              marginRight: 10,
-              fontWeight: "bold",
+              fontSize: isMobile ? 34 : 42,
+              color: "#4c1d95",
+              marginTop: 0,
+              marginBottom: 16,
             }}
           >
-            {mode === "boss" ? "Attaquer" : "Vérifier"}
-          </button>
+            {a} × {b} = ?
+          </h2>
 
-          <button
-            onClick={handlePass}
-            disabled={mode === "boss" && passesLeft <= 0}
-            style={{
-              padding: "10px 18px",
-              borderRadius: 12,
-              border: "2px solid #e9d5ff",
-              background:
-                mode === "boss" && passesLeft <= 0 ? "#f3f4f6" : "#ffffff",
-              color: mode === "boss" && passesLeft <= 0 ? "#9ca3af" : "#4c1d95",
-              cursor:
-                mode === "boss" && passesLeft <= 0 ? "not-allowed" : "pointer",
-              fontWeight: "bold",
+          <input
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") checkAnswer();
             }}
-          >
-            Passer
-          </button>
-        </div>
+            inputMode="numeric"
+            pattern="[0-9]*"
+            style={{
+              fontSize: 16,
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "2px solid #d8b4fe",
+              width: isMobile ? "100%" : 160,
+              maxWidth: 220,
+              color: "#4c1d95",
+              boxSizing: "border-box",
+            }}
+          />
 
-        {showThinkingPrompt && mode === "practice" && (
           <div
             style={{
-              marginTop: 16,
-              background: "#fef08a",
-              color: "#713f12",
-              padding: 14,
-              borderRadius: 14,
-              fontWeight: "bold",
+              marginTop: 14,
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              gap: 10,
             }}
           >
-            Tu es bon, respire, dis ta technique de réflexion à voix haute :)
-          </div>
-        )}
-
-        <h3 style={{ color: "#6b21a8" }}>{message}</h3>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(180px, 1fr))",
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
-        <Box label="Niveau" value={level} />
-        <Box label="XP" value={xp} />
-        <Box label="XP dans le niveau" value={`${xpInLevel}/100`} />
-        <Box label="Score" value={score} />
-        <Box label="Essais" value={attempts} />
-        <Box label="Précision" value={`${percent}%`} />
-        <Box label="Série actuelle" value={streak} />
-        <Box label="Meilleure série" value={bestStreak} />
-        <Box label="Dinos vaincus" value={bossWins} />
-      </div>
-
-      <div
-        style={{
-          background: "#faf5ff",
-          padding: 20,
-          borderRadius: 24,
-          border: "2px solid #e9d5ff",
-        }}
-      >
-        <h3 style={{ color: "#5b21b6" }}>Empreintes à retravailler</h3>
-
-        {weakList.length === 0 ? (
-          <p style={{ color: "#6b21a8" }}>
-            Aucune faiblesse détectée pour l’instant.
-          </p>
-        ) : (
-          weakList.map((item) => (
-            <div
-              key={item.key}
+            <button
+              onClick={checkAnswer}
               style={{
-                background: "#ffffff",
-                padding: 12,
-                borderRadius: 14,
-                marginBottom: 10,
-                border: "2px solid #f3e8ff",
+                padding: "10px 18px",
+                borderRadius: 12,
+                border: "none",
+                background: "#7c3aed",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: "bold",
+                width: isMobile ? "100%" : "auto",
+                minHeight: 48,
               }}
             >
-              <strong style={{ color: "#4c1d95" }}>
-                {item.key.replace("x", " × ")}
-              </strong>
-              <div style={{ color: "#6b21a8", marginTop: 4 }}>
-                Erreurs : {item.wrong} · Réussites : {item.right}
-              </div>
+              {mode === "boss" ? "Attaquer" : "Vérifier"}
+            </button>
+
+            <button
+              onClick={handlePass}
+              disabled={mode === "boss" && passesLeft <= 0}
+              style={{
+                padding: "10px 18px",
+                borderRadius: 12,
+                border: "2px solid #e9d5ff",
+                background:
+                  mode === "boss" && passesLeft <= 0 ? "#f3f4f6" : "#ffffff",
+                color: mode === "boss" && passesLeft <= 0 ? "#9ca3af" : "#4c1d95",
+                cursor:
+                  mode === "boss" && passesLeft <= 0 ? "not-allowed" : "pointer",
+                fontWeight: "bold",
+                width: isMobile ? "100%" : "auto",
+                minHeight: 48,
+              }}
+            >
+              Passer
+            </button>
+          </div>
+
+          {showThinkingPrompt && mode === "practice" && (
+            <div
+              style={{
+                marginTop: 16,
+                background: "#fef08a",
+                color: "#713f12",
+                padding: 14,
+                borderRadius: 14,
+                fontWeight: "bold",
+              }}
+            >
+              Tu es bon, respire, dis ta technique de réflexion à voix haute :)
             </div>
-          ))
-        )}
+          )}
+
+          <h3 style={{ color: "#6b21a8" }}>{message}</h3>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile
+              ? "repeat(2, minmax(0, 1fr))"
+              : "repeat(3, minmax(180px, 1fr))",
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          <Box label="Niveau" value={level} />
+          <Box label="XP" value={xp} />
+          <Box label="XP dans le niveau" value={`${xpInLevel}/100`} />
+          <Box label="Score" value={score} />
+          <Box label="Essais" value={attempts} />
+          <Box label="Précision" value={`${percent}%`} />
+          <Box label="Série actuelle" value={streak} />
+          <Box label="Meilleure série" value={bestStreak} />
+          <Box label="Dinos vaincus" value={bossWins} />
+        </div>
+
+        <div
+          style={{
+            background: "#faf5ff",
+            padding: isMobile ? 16 : 20,
+            borderRadius: 24,
+            border: "2px solid #e9d5ff",
+          }}
+        >
+          <h3 style={{ color: "#5b21b6", marginTop: 0 }}>
+            Empreintes à retravailler
+          </h3>
+
+          {weakList.length === 0 ? (
+            <p style={{ color: "#6b21a8" }}>
+              Aucune faiblesse détectée pour l’instant.
+            </p>
+          ) : (
+            weakList.map((item) => (
+              <div
+                key={item.key}
+                style={{
+                  background: "#ffffff",
+                  padding: 12,
+                  borderRadius: 14,
+                  marginBottom: 10,
+                  border: "2px solid #f3e8ff",
+                }}
+              >
+                <strong style={{ color: "#4c1d95" }}>
+                  {item.key.replace("x", " × ")}
+                </strong>
+                <div style={{ color: "#6b21a8", marginTop: 4 }}>
+                  Erreurs : {item.wrong} · Réussites : {item.right}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {showBossVictory && (
@@ -790,6 +876,7 @@ export default function App() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 999,
+            padding: 16,
           }}
         >
           <div
@@ -797,7 +884,7 @@ export default function App() {
               background: "linear-gradient(180deg, #fff7cc, #faf5ff)",
               border: "3px solid #fde047",
               borderRadius: 28,
-              padding: 30,
+              padding: isMobile ? 22 : 30,
               width: "min(90vw, 420px)",
               textAlign: "center",
               boxShadow: "0 20px 50px rgba(91, 33, 182, 0.25)",
@@ -835,6 +922,8 @@ export default function App() {
                 fontWeight: "bold",
                 cursor: "pointer",
                 fontSize: 16,
+                minHeight: 48,
+                width: isMobile ? "100%" : "auto",
               }}
             >
               Continuer
@@ -856,7 +945,7 @@ function Box({ label, value }) {
         border: "2px solid #e9d5ff",
       }}
     >
-      <div style={{ color: "#6b21a8" }}>{label}</div>
+      <div style={{ color: "#6b21a8", fontSize: 14 }}>{label}</div>
       <strong style={{ fontSize: 24, color: "#4c1d95" }}>{value}</strong>
     </div>
   );
