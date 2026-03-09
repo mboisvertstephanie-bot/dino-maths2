@@ -283,7 +283,11 @@ export default function App() {
   const [defeatedBossName, setDefeatedBossName] = useState("");
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
+  const [feedbackType, setFeedbackType] = useState("idle"); // idle | correct | wrong
+  const [shakeCount, setShakeCount] = useState(0);
+
   const timerRef = useRef(null);
+  const audioContextRef = useRef(null);
 
   const level = Math.floor(xp / 100) + 1;
   const xpInLevel = xp % 100;
@@ -306,6 +310,117 @@ export default function App() {
     }
   }
 
+  function triggerVisualFeedback(type) {
+    setFeedbackType(type);
+
+    if (type === "wrong") {
+      setShakeCount((prev) => prev + 1);
+    }
+
+    window.setTimeout(() => {
+      setFeedbackType("idle");
+    }, 550);
+  }
+
+  function getAudioContext() {
+    try {
+      if (!audioContextRef.current) {
+        const AudioContextClass =
+          window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return null;
+        audioContextRef.current = new AudioContextClass();
+      }
+
+      const ctx = audioContextRef.current;
+
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      return ctx;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function playTone({
+    frequency = 440,
+    duration = 120,
+    type = "sine",
+    volume = 0.06,
+    startDelay = 0,
+  }) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const startTime = ctx.currentTime + startDelay;
+      const endTime = startTime + duration / 1000;
+
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+
+      gainNode.gain.setValueAtTime(0.0001, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(volume, startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator.start(startTime);
+      oscillator.stop(endTime);
+    } catch (error) {
+      // ignore audio errors
+    }
+  }
+
+  function playCorrectSound() {
+    playTone({
+      frequency: 720,
+      duration: 90,
+      type: "triangle",
+      volume: 0.05,
+      startDelay: 0,
+    });
+
+    playTone({
+      frequency: 940,
+      duration: 120,
+      type: "triangle",
+      volume: 0.05,
+      startDelay: 0.08,
+    });
+  }
+
+  function playWrongSound() {
+    playTone({
+      frequency: 260,
+      duration: 120,
+      type: "sawtooth",
+      volume: 0.065,
+      startDelay: 0,
+    });
+
+    playTone({
+      frequency: 180,
+      duration: 180,
+      type: "square",
+      volume: 0.06,
+      startDelay: 0.08,
+    });
+
+    playTone({
+      frequency: 120,
+      duration: 220,
+      type: "square",
+      volume: 0.05,
+      startDelay: 0.16,
+    });
+  }
+
   function startBossTimer(timeLimit, bossProfileOverride = currentBoss) {
     clearBossInterval();
     setBossTimer(timeLimit);
@@ -315,6 +430,8 @@ export default function App() {
         if (prev <= 1) {
           clearBossInterval();
 
+          triggerVisualFeedback("wrong");
+          playWrongSound();
           setStreak(0);
           setBossHealth((currentHealth) =>
             Math.min(bossProfileOverride.maxHealth, currentHealth + 2)
@@ -359,6 +476,7 @@ export default function App() {
     setB(result.question.b);
     setAnswer("");
     setShowThinkingPrompt(false);
+    setFeedbackType("idle");
 
     if (nextMode === "practice") {
       clearBossInterval();
@@ -434,6 +552,9 @@ export default function App() {
     setWeakFacts(nextWeakFacts);
 
     if (correct) {
+      triggerVisualFeedback("correct");
+      playCorrectSound();
+
       setScore((prev) => prev + 1);
       setXp((prev) => prev + (mode === "boss" ? 15 : 10));
 
@@ -466,6 +587,8 @@ export default function App() {
         setMessage("Bravo, prends ton temps, tu réfléchis bien !");
       }
     } else {
+      triggerVisualFeedback("wrong");
+      playWrongSound();
       setStreak(0);
 
       if (mode === "boss") {
@@ -505,6 +628,7 @@ export default function App() {
     setAnswer("");
     setShowThinkingPrompt(false);
     setShowBossVictory(false);
+    setFeedbackType("idle");
   }
 
   function startGame() {
@@ -512,6 +636,7 @@ export default function App() {
     setMessage("");
     setAnswer("");
     setShowThinkingPrompt(false);
+    setFeedbackType("idle");
 
     if (mode === "boss") {
       const boss = getBossProfile(bossWins);
@@ -540,6 +665,7 @@ export default function App() {
     setAnswer("");
     setMessage("");
     setShowThinkingPrompt(false);
+    setFeedbackType("idle");
   }
 
   const percent = attempts === 0 ? 0 : Math.round((score / attempts) * 100);
@@ -564,6 +690,22 @@ export default function App() {
     0,
     Math.round((bossTimer / currentBoss.timeLimit) * 100)
   );
+
+  const operationLabel =
+    operation === "multiplication"
+      ? "Multiplication"
+      : operation === "division"
+      ? "Division"
+      : operation === "addition"
+      ? "Addition"
+      : "Soustraction";
+
+  const questionCardTransform =
+    feedbackType === "wrong"
+      ? shakeCount % 2 === 0
+        ? "translateX(-8px)"
+        : "translateX(8px)"
+      : "translateX(0)";
 
   return (
     <div
@@ -891,8 +1033,13 @@ export default function App() {
                 style={{
                   width: `${bossHealthPercent}%`,
                   height: "100%",
-                  background: "linear-gradient(90deg, #7c3aed, #c084fc)",
-                  transition: "width 0.3s ease",
+                  background:
+                    feedbackType === "correct"
+                      ? "linear-gradient(90deg, #16a34a, #86efac)"
+                      : feedbackType === "wrong"
+                      ? "linear-gradient(90deg, #dc2626, #fca5a5)"
+                      : "linear-gradient(90deg, #7c3aed, #c084fc)",
+                  transition: "width 0.3s ease, background 0.2s ease",
                 }}
               />
             </div>
@@ -935,12 +1082,30 @@ export default function App() {
 
           <div
             style={{
-              background: "#faf5ff",
+              background:
+                feedbackType === "correct"
+                  ? "#dcfce7"
+                  : feedbackType === "wrong"
+                  ? "#fee2e2"
+                  : "#faf5ff",
               padding: isMobile ? 16 : 25,
               borderRadius: 24,
               marginBottom: 20,
-              border: "2px solid #e9d5ff",
-              boxShadow: "0 8px 24px rgba(124,58,237,0.08)",
+              border:
+                feedbackType === "correct"
+                  ? "2px solid #22c55e"
+                  : feedbackType === "wrong"
+                  ? "2px solid #ef4444"
+                  : "2px solid #e9d5ff",
+              boxShadow:
+                feedbackType === "correct"
+                  ? "0 8px 24px rgba(34,197,94,0.18)"
+                  : feedbackType === "wrong"
+                  ? "0 8px 24px rgba(239,68,68,0.18)"
+                  : "0 8px 24px rgba(124,58,237,0.08)",
+              transform: questionCardTransform,
+              transition:
+                "background 0.18s ease, border 0.18s ease, box-shadow 0.18s ease, transform 0.08s ease",
             }}
           >
             <div
@@ -951,13 +1116,7 @@ export default function App() {
               }}
             >
               {mode === "practice" ? "Mode pratique" : "Mode combat de boss"} ·{" "}
-              {operation === "multiplication"
-                ? "Multiplication"
-                : operation === "division"
-                ? "Division"
-                : operation === "addition"
-                ? "Addition"
-                : "Soustraction"}
+              {operationLabel}
             </div>
 
             <h2
@@ -983,11 +1142,18 @@ export default function App() {
                 fontSize: 16,
                 padding: "12px 14px",
                 borderRadius: 12,
-                border: "2px solid #d8b4fe",
+                border:
+                  feedbackType === "correct"
+                    ? "2px solid #22c55e"
+                    : feedbackType === "wrong"
+                    ? "2px solid #ef4444"
+                    : "2px solid #d8b4fe",
                 width: "100%",
                 maxWidth: isMobile ? "100%" : 220,
                 color: "#4c1d95",
                 boxSizing: "border-box",
+                outline: "none",
+                background: "#ffffff",
               }}
             />
 
@@ -1005,17 +1171,57 @@ export default function App() {
                   padding: "10px 18px",
                   borderRadius: 12,
                   border: "none",
-                  background: "#7c3aed",
+                  background:
+                    feedbackType === "correct"
+                      ? "#16a34a"
+                      : feedbackType === "wrong"
+                      ? "#dc2626"
+                      : "#7c3aed",
                   color: "white",
                   cursor: "pointer",
                   fontWeight: "bold",
                   width: isMobile ? "100%" : "auto",
                   minHeight: 48,
+                  transition: "background 0.18s ease",
                 }}
               >
                 {mode === "boss" ? "Attaquer" : "Vérifier"}
               </button>
             </div>
+
+            {feedbackType === "correct" && (
+              <div
+                style={{
+                  marginTop: 14,
+                  background: "#16a34a",
+                  color: "white",
+                  padding: 12,
+                  borderRadius: 12,
+                  fontWeight: "bold",
+                  textAlign: "center",
+                  fontSize: 18,
+                }}
+              >
+                ✅ Bravo !
+              </div>
+            )}
+
+            {feedbackType === "wrong" && (
+              <div
+                style={{
+                  marginTop: 14,
+                  background: "#dc2626",
+                  color: "white",
+                  padding: 12,
+                  borderRadius: 12,
+                  fontWeight: "bold",
+                  textAlign: "center",
+                  fontSize: 18,
+                }}
+              >
+                ❌ Oups !
+              </div>
+            )}
 
             {showThinkingPrompt && mode === "practice" && (
               <div
