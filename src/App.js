@@ -174,6 +174,7 @@ export default function App() {
   const [skipQueue, setSkipQueue] = useState([]);
 
   const [showBossVictory, setShowBossVictory] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const [defeatedBossName, setDefeatedBossName] = useState("");
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
@@ -267,10 +268,8 @@ export default function App() {
   }
 
   useEffect(() => {
-    askNewQuestion(selectedTables, mode, weakFacts, skipQueue, currentBoss);
-    return () => clearBossInterval();
-    // eslint-disable-next-line
-  }, []);
+  return () => clearBossInterval();
+}, []);
 
   useEffect(() => {
     if (mode !== "practice") return;
@@ -445,6 +444,36 @@ export default function App() {
     }
   }
 
+function startGame() {
+  setGameStarted(true);
+  setMessage("");
+  setAnswer("");
+  setShowThinkingPrompt(false);
+
+  if (mode === "boss") {
+    const boss = getBossProfile(bossWins);
+    setBossHealth(boss.maxHealth);
+    setBossTimer(boss.timeLimit);
+    setPassesLeft(3);
+    setSkipQueue([]);
+    window.setTimeout(() => {
+      askNewQuestion(selectedTables, "boss", weakFacts, [], boss);
+    }, 0);
+  } else {
+    window.setTimeout(() => {
+      askNewQuestion(selectedTables, "practice", weakFacts, [], currentBoss);
+    }, 0);
+  }
+}
+
+function goBackToMenu() {
+  clearBossInterval();
+  setGameStarted(false);
+  setAnswer("");
+  setMessage("");
+  setShowThinkingPrompt(false);
+}
+
   const percent = attempts === 0 ? 0 : Math.round((score / attempts) * 100);
 
   const weakList = useMemo(() => {
@@ -479,6 +508,7 @@ export default function App() {
         color: "#4c1d95",
       }}
     >
+      {!gameStarted ? (
       <div
         style={{
           position: "sticky",
@@ -706,6 +736,7 @@ export default function App() {
             boxShadow: "0 8px 24px rgba(124,58,237,0.08)",
           }}
         >
+          ) : (
           <div style={{ marginBottom: 10, color: "#7e22ce", fontWeight: "bold" }}>
             {mode === "practice" ? "Mode pratique" : "Mode combat de boss"}
           </div>
@@ -866,7 +897,7 @@ export default function App() {
         </div>
       </div>
 
-      {showBossVictory && (
+     {showBossVictory && (
         <div
           style={{
             position: "fixed",
@@ -931,6 +962,7 @@ export default function App() {
           </div>
         </div>
       )}
+    )}
     </div>
   );
 }
