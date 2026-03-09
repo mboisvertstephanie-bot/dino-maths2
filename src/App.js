@@ -337,7 +337,7 @@ export default function App() {
       });
 
       if (mode === "boss") {
-        const damage = 2;
+        const damage = 1;
         const nextHealth = bossHealth - damage;
 
         if (nextHealth <= 0) {
