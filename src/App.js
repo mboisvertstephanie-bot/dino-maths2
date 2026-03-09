@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function randomFromArray(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -8,7 +8,7 @@ function getFactKey(a, b) {
   return `${a}x${b}`;
 }
 
-function pickWeightedQuestion(selectedTables, weakFacts, mode) {
+function pickWeightedQuestion(selectedTables, weakFacts, mode, skipQueue = []) {
   const pool = [];
 
   selectedTables.forEach((table) => {
@@ -21,17 +21,134 @@ function pickWeightedQuestion(selectedTables, weakFacts, mode) {
       if (mode !== "boss") {
         weight += stats.wrong * 3;
         weight -= stats.right * 0.3;
+      } else {
+        weight += stats.wrong * 2;
       }
 
       weight = Math.max(1, Math.round(weight));
 
       for (let i = 0; i < weight; i++) {
-        pool.push({ a: table, b: multiplier });
+        pool.push({ a: table, b: multiplier, key });
       }
     }
   });
 
-  return randomFromArray(pool);
+  if (skipQueue.length > 0) {
+    return {
+      question: skipQueue[0],
+      usedSkipQueue: true,
+    };
+  }
+
+  return {
+    question: randomFromArray(pool),
+    usedSkipQueue: false,
+  };
+}
+
+function getBossProfile(bossWins) {
+  const bosses = [
+    {
+      name: "Vélo-Raptor",
+      min: 0,
+      icon: "🦖",
+      size: "Petit boss",
+      maxHealth: 8,
+      timeLimit: 10,
+    },
+    {
+      name: "Tricéra-Boom",
+      min: 2,
+      icon: "🦕",
+      size: "Boss costaud",
+      maxHealth: 10,
+      timeLimit: 9,
+    },
+    {
+      name: "Stégo-Tonnerre",
+      min: 4,
+      icon: "⚡",
+      size: "Boss géant",
+      maxHealth: 12,
+      timeLimit: 8,
+    },
+    {
+      name: "Spinosaure Suprême",
+      min: 6,
+      icon: "🔥",
+      size: "Boss monstrueux",
+      maxHealth: 14,
+      timeLimit: 7,
+    },
+    {
+      name: "Tyranno Max",
+      min: 8,
+      icon: "☄️",
+      size: "Boss titan",
+      maxHealth: 16,
+      timeLimit: 6,
+    },
+    {
+      name: "Giga Dino Colossal",
+      min: 10,
+      icon: "🌋",
+      size: "Boss légendaire",
+      maxHealth: 18,
+      timeLimit: 5,
+    },
+  ];
+
+  return (
+    [...bosses].reverse().find((boss) => bossWins >= boss.min) || bosses[0]
+  );
+}
+
+function getEggStage(level) {
+  if (level <= 2) {
+    return {
+      icon: "🥚",
+      name: "Œuf mystérieux",
+      text: "Ton dino dort encore dans son œuf.",
+    };
+  }
+
+  if (level <= 4) {
+    return {
+      icon: "🥚✨",
+      name: "Œuf craquelé",
+      text: "Ça bouge là-dedans. Ton dino se réveille.",
+    };
+  }
+
+  if (level <= 6) {
+    return {
+      icon: "🐣🦖",
+      name: "Bébé raptor",
+      text: "Ton mini dino est sorti. Il apprend avec toi.",
+    };
+  }
+
+  if (level <= 8) {
+    return {
+      icon: "🦖",
+      name: "Jeune dino",
+      text: "Ton dino grandit vite. Il devient solide.",
+    };
+  }
+
+  if (level <= 11) {
+    return {
+      icon: "🦕",
+      name: "Dino puissant",
+      text: "Ton compagnon dino est maintenant très fort.",
+    };
+  }
+
+  return {
+    icon: "👑🦖",
+    name: "Dino légendaire",
+    text: "Ton dino est devenu une légende du Jurassique.",
+  };
 }
 
 export default function App() {
@@ -43,7 +160,6 @@ export default function App() {
   const [mode, setMode] = useState("practice");
   const [score, setScore] = useState(0);
   const [attempts, setAttempts] = useState(0);
-  const [challengeDone, setChallengeDone] = useState(0);
   const [showThinkingPrompt, setShowThinkingPrompt] = useState(false);
 
   const [xp, setXp] = useState(0);
@@ -52,27 +168,103 @@ export default function App() {
   const [bossWins, setBossWins] = useState(0);
   const [weakFacts, setWeakFacts] = useState({});
 
-  const challengeTarget = 10;
+  const [bossHealth, setBossHealth] = useState(getBossProfile(0).maxHealth);
+  const [bossTimer, setBossTimer] = useState(getBossProfile(0).timeLimit);
+  const [passesLeft, setPassesLeft] = useState(3);
+  const [skipQueue, setSkipQueue] = useState([]);
 
-  const dinoBosses = [
-    { name: "Vélo-Raptor", min: 0, icon: "🦖", size: "Petit boss" },
-    { name: "Tricéra-Boom", min: 2, icon: "🦕", size: "Boss costaud" },
-    { name: "Stégo-Tonnerre", min: 4, icon: "⚡", size: "Boss géant" },
-    { name: "Spinosaure Suprême", min: 6, icon: "🔥", size: "Boss monstrueux" },
-    { name: "Tyranno Max", min: 8, icon: "☄️", size: "Boss titan" },
-    {
-      name: "Giga Dino Colossal",
-      min: 10,
-      icon: "🌋",
-      size: "Boss légendaire",
-    },
-  ];
+  const [showBossVictory, setShowBossVictory] = useState(false);
+  const [defeatedBossName, setDefeatedBossName] = useState("");
 
-  const currentBoss =
-    [...dinoBosses].reverse().find((boss) => bossWins >= boss.min) ||
-    dinoBosses[0];
+  const timerRef = useRef(null);
+
+  const level = Math.floor(xp / 100) + 1;
+  const xpInLevel = xp % 100;
+  const currentBoss = getBossProfile(bossWins);
+  const eggStage = getEggStage(level);
+
+  function clearBossInterval() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  function startBossTimer(timeLimit, bossProfileOverride = currentBoss) {
+    clearBossInterval();
+    setBossTimer(timeLimit);
+
+    timerRef.current = setInterval(() => {
+      setBossTimer((prev) => {
+        if (prev <= 1) {
+          clearBossInterval();
+
+          setStreak(0);
+          setBossHealth((currentHealth) =>
+            Math.min(bossProfileOverride.maxHealth, currentHealth + 2)
+          );
+          setMessage(
+            `⏰ Trop tard ! ${bossProfileOverride.name} regagne 2 points de vie.`
+          );
+
+          window.setTimeout(() => {
+            askNewQuestion(
+              selectedTables,
+              "boss",
+              weakFacts,
+              skipQueue,
+              bossProfileOverride
+            );
+          }, 250);
+
+          return 0;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function askNewQuestion(
+    nextTables = selectedTables,
+    nextMode = mode,
+    nextWeakFacts = weakFacts,
+    nextSkipQueue = skipQueue,
+    bossProfileOverride = currentBoss
+  ) {
+    const result = pickWeightedQuestion(
+      nextTables,
+      nextWeakFacts,
+      nextMode,
+      nextSkipQueue
+    );
+
+    setA(result.question.a);
+    setB(result.question.b);
+    setAnswer("");
+    setShowThinkingPrompt(false);
+
+    if (nextMode === "practice") {
+      clearBossInterval();
+    }
+
+    if (nextMode === "boss") {
+      if (result.usedSkipQueue) {
+        setSkipQueue((prev) => prev.slice(1));
+      }
+      startBossTimer(bossProfileOverride.timeLimit, bossProfileOverride);
+    }
+  }
 
   useEffect(() => {
+    askNewQuestion(selectedTables, mode, weakFacts, skipQueue, currentBoss);
+    return () => clearBossInterval();
+    // eslint-disable-next-line
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "practice") return;
+
     setShowThinkingPrompt(false);
 
     const timer = setTimeout(() => {
@@ -80,25 +272,21 @@ export default function App() {
     }, 5000);
 
     return () => clearTimeout(timer);
-  }, [a, b]);
-
-  function newQuestion(
-    nextTables = selectedTables,
-    nextMode = mode,
-    nextWeakFacts = weakFacts
-  ) {
-    const next = pickWeightedQuestion(nextTables, nextWeakFacts, nextMode);
-    setA(next.a);
-    setB(next.b);
-    setAnswer("");
-    setMessage("");
-    setShowThinkingPrompt(false);
-  }
+  }, [a, b, mode]);
 
   useEffect(() => {
-    newQuestion(selectedTables, mode, weakFacts);
+    if (mode === "boss" && !showBossVictory) {
+      setBossHealth(currentBoss.maxHealth);
+      setBossTimer(currentBoss.timeLimit);
+      setPassesLeft(3);
+      setSkipQueue([]);
+      clearBossInterval();
+      startBossTimer(currentBoss.timeLimit, currentBoss);
+    } else {
+      clearBossInterval();
+    }
     // eslint-disable-next-line
-  }, []);
+  }, [bossWins]);
 
   function toggleTable(table) {
     let updated;
@@ -111,7 +299,7 @@ export default function App() {
     }
 
     setSelectedTables(updated);
-    newQuestion(updated, mode, weakFacts);
+    askNewQuestion(updated, mode, weakFacts, skipQueue, currentBoss);
   }
 
   function buildNextWeakFacts(correct) {
@@ -128,7 +316,7 @@ export default function App() {
   }
 
   function checkAnswer() {
-    const correct = parseInt(answer) === a * b;
+    const correct = parseInt(answer, 10) === a * b;
 
     setAttempts((prev) => prev + 1);
     setShowThinkingPrompt(false);
@@ -138,9 +326,7 @@ export default function App() {
 
     if (correct) {
       setScore((prev) => prev + 1);
-
-      const gainedXp = mode === "boss" ? 15 : mode === "challenge" ? 12 : 10;
-      setXp((prev) => prev + gainedXp);
+      setXp((prev) => prev + (mode === "boss" ? 15 : 10));
 
       setStreak((prev) => {
         const next = prev + 1;
@@ -150,36 +336,106 @@ export default function App() {
         return next;
       });
 
-      if (mode === "challenge") {
-        setChallengeDone((prev) => prev + 1);
-      }
+      if (mode === "boss") {
+        const damage = 2;
+        const nextHealth = bossHealth - damage;
 
-      if (mode === "boss" && streak + 1 >= 8) {
-        setBossWins((prev) => prev + 1);
-        setMessage(`Boss battu ! ${currentBoss.name} a reculé devant toi.`);
+        if (nextHealth <= 0) {
+          clearBossInterval();
+          setDefeatedBossName(currentBoss.name);
+          setShowBossVictory(true);
+          setBossWins((prev) => prev + 1);
+          setMessage("");
+          return;
+        } else {
+          setBossHealth(nextHealth);
+          setMessage(
+            `Touché ! ${currentBoss.name} perd ${damage} points de vie.`
+          );
+        }
       } else {
-        setMessage("Bravo, dino-génie !");
+        setMessage("Bravo, prends ton temps, tu réfléchis bien !");
       }
     } else {
       setStreak(0);
-      setMessage(`Oups ! La bonne réponse était ${a * b}.`);
+
+      if (mode === "boss") {
+        const healed = Math.min(currentBoss.maxHealth, bossHealth + 1);
+        setBossHealth(healed);
+        setMessage(
+          `Oups ! La bonne réponse était ${a * b}. ${
+            currentBoss.name
+          } regagne 1 point de vie.`
+        );
+      } else {
+        setMessage(`Oups ! La bonne réponse était ${a * b}.`);
+      }
     }
 
-    newQuestion(selectedTables, mode, nextWeakFacts);
+    askNewQuestion(selectedTables, mode, nextWeakFacts, skipQueue, currentBoss);
+  }
+
+  function handlePass() {
+    if (mode === "practice") {
+      askNewQuestion(selectedTables, mode, weakFacts, skipQueue, currentBoss);
+      return;
+    }
+
+    if (passesLeft <= 0) return;
+
+    const questionToRequeue = { a, b, key: getFactKey(a, b) };
+    const updatedQueue = [...skipQueue, questionToRequeue];
+
+    setSkipQueue(updatedQueue);
+    setPassesLeft((prev) => prev - 1);
+    setMessage("Question passée. Elle reviendra plus tard.");
+    askNewQuestion(
+      selectedTables,
+      "boss",
+      weakFacts,
+      updatedQueue,
+      currentBoss
+    );
+  }
+
+  function continueAfterBossVictory() {
+    const nextBoss = getBossProfile(bossWins);
+
+    setShowBossVictory(false);
+    setMessage("Super ! Tu passes au prochain boss 🦖");
+    setBossHealth(nextBoss.maxHealth);
+    setBossTimer(nextBoss.timeLimit);
+    setPassesLeft(3);
+    setSkipQueue([]);
+    askNewQuestion(selectedTables, "boss", weakFacts, [], nextBoss);
   }
 
   function switchMode(newMode) {
+    clearBossInterval();
     setMode(newMode);
-    if (newMode !== "challenge") {
-      setChallengeDone(0);
-    }
     setMessage("");
-    newQuestion(selectedTables, newMode, weakFacts);
+    setAnswer("");
+    setShowThinkingPrompt(false);
+    setShowBossVictory(false);
+
+    if (newMode === "boss") {
+      const boss = getBossProfile(bossWins);
+      setBossHealth(boss.maxHealth);
+      setBossTimer(boss.timeLimit);
+      setPassesLeft(3);
+      setSkipQueue([]);
+      window.setTimeout(() => {
+        askNewQuestion(selectedTables, "boss", weakFacts, [], boss);
+      }, 0);
+    } else {
+      setSkipQueue([]);
+      window.setTimeout(() => {
+        askNewQuestion(selectedTables, "practice", weakFacts, [], currentBoss);
+      }, 0);
+    }
   }
 
   const percent = attempts === 0 ? 0 : Math.round((score / attempts) * 100);
-  const level = Math.floor(xp / 100) + 1;
-  const xpInLevel = xp % 100;
 
   const weakList = useMemo(() => {
     return Object.entries(weakFacts)
@@ -190,9 +446,17 @@ export default function App() {
         priority: (value.wrong || 0) - (value.right || 0) * 0.3,
       }))
       .filter((item) => item.wrong > 0)
-      .sort((a, b) => b.priority - a.priority)
+      .sort((aItem, bItem) => bItem.priority - aItem.priority)
       .slice(0, 5);
   }, [weakFacts]);
+
+  const bossHealthPercent = Math.round(
+    (bossHealth / currentBoss.maxHealth) * 100
+  );
+  const bossTimePercent = Math.max(
+    0,
+    Math.round((bossTimer / currentBoss.timeLimit) * 100)
+  );
 
   return (
     <div
@@ -240,8 +504,7 @@ export default function App() {
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ color: "#5b21b6" }}>Mode d’aventure</h3>
         {[
-          { key: "practice", label: "Exploration" },
-          { key: "challenge", label: "Défi dino" },
+          { key: "practice", label: "Pratique" },
           { key: "boss", label: "Combat de boss" },
         ].map((item) => (
           <button
@@ -266,6 +529,115 @@ export default function App() {
 
       <div
         style={{
+          background: "#fff7cc",
+          padding: 20,
+          borderRadius: 24,
+          marginBottom: 20,
+          border: "2px solid #fde047",
+        }}
+      >
+        <h3 style={{ color: "#713f12", marginTop: 0 }}>Œuf de dinosaure</h3>
+        <p
+          style={{
+            fontSize: 34,
+            fontWeight: "bold",
+            margin: "6px 0",
+            color: "#5b21b6",
+          }}
+        >
+          {eggStage.icon} {eggStage.name}
+        </p>
+        <p style={{ margin: 0, color: "#7c2d12", fontWeight: "bold" }}>
+          {eggStage.text}
+        </p>
+      </div>
+
+      <div
+        style={{
+          background: "#fff7cc",
+          padding: 20,
+          borderRadius: 24,
+          marginBottom: 20,
+          border: "2px solid #fde047",
+        }}
+      >
+        <h3 style={{ color: "#713f12", marginTop: 0 }}>
+          Boss dinosaure actuel
+        </h3>
+        <p
+          style={{
+            fontSize: 30,
+            fontWeight: "bold",
+            margin: "6px 0",
+            color: "#5b21b6",
+          }}
+        >
+          {currentBoss.icon} {currentBoss.name}
+        </p>
+        <p
+          style={{ margin: "0 0 10px 0", color: "#7c2d12", fontWeight: "bold" }}
+        >
+          {currentBoss.size} · Dinos vaincus : {bossWins}
+        </p>
+
+        <div style={{ marginBottom: 8, color: "#713f12", fontWeight: "bold" }}>
+          Vie du boss : {bossHealth}/{currentBoss.maxHealth}
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            height: 22,
+            background: "#fde68a",
+            borderRadius: 999,
+            overflow: "hidden",
+            border: "2px solid #facc15",
+            marginBottom: mode === "boss" ? 12 : 0,
+          }}
+        >
+          <div
+            style={{
+              width: `${bossHealthPercent}%`,
+              height: "100%",
+              background: "linear-gradient(90deg, #7c3aed, #c084fc)",
+              transition: "width 0.3s ease",
+            }}
+          />
+        </div>
+
+        {mode === "boss" && (
+          <>
+            <div
+              style={{ marginBottom: 8, color: "#713f12", fontWeight: "bold" }}
+            >
+              Temps restant : {bossTimer}s · Passes restantes : {passesLeft}/3
+            </div>
+
+            <div
+              style={{
+                width: "100%",
+                height: 18,
+                background: "#ede9fe",
+                borderRadius: 999,
+                overflow: "hidden",
+                border: "2px solid #c4b5fd",
+              }}
+            >
+              <div
+                style={{
+                  width: `${bossTimePercent}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg, #facc15, #7c3aed)",
+                  transition: "width 1s linear",
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div
+        style={{
           background: "#faf5ff",
           padding: 25,
           borderRadius: 24,
@@ -275,11 +647,7 @@ export default function App() {
         }}
       >
         <div style={{ marginBottom: 10, color: "#7e22ce", fontWeight: "bold" }}>
-          {mode === "practice"
-            ? "Mode exploration"
-            : mode === "challenge"
-            ? "Mode défi dino"
-            : "Mode combat de boss"}
+          {mode === "practice" ? "Mode pratique" : "Mode combat de boss"}
         </div>
 
         <h2 style={{ fontSize: 42, color: "#4c1d95" }}>
@@ -316,26 +684,29 @@ export default function App() {
               fontWeight: "bold",
             }}
           >
-            Attaquer
+            {mode === "boss" ? "Attaquer" : "Vérifier"}
           </button>
 
           <button
-            onClick={() => newQuestion()}
+            onClick={handlePass}
+            disabled={mode === "boss" && passesLeft <= 0}
             style={{
               padding: "10px 18px",
               borderRadius: 12,
               border: "2px solid #e9d5ff",
-              background: "#ffffff",
-              color: "#4c1d95",
-              cursor: "pointer",
+              background:
+                mode === "boss" && passesLeft <= 0 ? "#f3f4f6" : "#ffffff",
+              color: mode === "boss" && passesLeft <= 0 ? "#9ca3af" : "#4c1d95",
+              cursor:
+                mode === "boss" && passesLeft <= 0 ? "not-allowed" : "pointer",
               fontWeight: "bold",
             }}
           >
-            Nouvelle trace
+            Passer
           </button>
         </div>
 
-        {showThinkingPrompt && (
+        {showThinkingPrompt && mode === "practice" && (
           <div
             style={{
               marginTop: 16,
@@ -355,33 +726,6 @@ export default function App() {
 
       <div
         style={{
-          background: "#fff7cc",
-          padding: 20,
-          borderRadius: 24,
-          marginBottom: 20,
-          border: "2px solid #fde047",
-        }}
-      >
-        <h3 style={{ color: "#713f12", marginTop: 0 }}>
-          Boss dinosaure actuel
-        </h3>
-        <p
-          style={{
-            fontSize: 30,
-            fontWeight: "bold",
-            margin: "6px 0",
-            color: "#5b21b6",
-          }}
-        >
-          {currentBoss.icon} {currentBoss.name}
-        </p>
-        <p style={{ margin: 0, color: "#7c2d12", fontWeight: "bold" }}>
-          {currentBoss.size} · Dinos vaincus : {bossWins}
-        </p>
-      </div>
-
-      <div
-        style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, minmax(180px, 1fr))",
           gap: 12,
@@ -397,28 +741,6 @@ export default function App() {
         <Box label="Série actuelle" value={streak} />
         <Box label="Meilleure série" value={bestStreak} />
         <Box label="Dinos vaincus" value={bossWins} />
-      </div>
-
-      <div
-        style={{
-          background: "#faf5ff",
-          padding: 20,
-          borderRadius: 24,
-          marginBottom: 20,
-          border: "2px solid #e9d5ff",
-        }}
-      >
-        <h3 style={{ color: "#5b21b6" }}>Défi dino</h3>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 22,
-            fontWeight: "bold",
-            color: "#4c1d95",
-          }}
-        >
-          {challengeDone}/{challengeTarget}
-        </p>
       </div>
 
       <div
@@ -457,6 +779,69 @@ export default function App() {
           ))
         )}
       </div>
+
+      {showBossVictory && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(76, 29, 149, 0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+          }}
+        >
+          <div
+            style={{
+              background: "linear-gradient(180deg, #fff7cc, #faf5ff)",
+              border: "3px solid #fde047",
+              borderRadius: 28,
+              padding: 30,
+              width: "min(90vw, 420px)",
+              textAlign: "center",
+              boxShadow: "0 20px 50px rgba(91, 33, 182, 0.25)",
+            }}
+          >
+            <div style={{ fontSize: 56, marginBottom: 10 }}>🎉🦖✨</div>
+
+            <h2 style={{ color: "#5b21b6", marginTop: 0, marginBottom: 10 }}>
+              Boss battu !
+            </h2>
+
+            <p
+              style={{
+                color: "#713f12",
+                fontWeight: "bold",
+                fontSize: 20,
+                marginBottom: 10,
+              }}
+            >
+              Super ! Tu passes au prochain boss !
+            </p>
+
+            <p style={{ color: "#6b21a8", marginBottom: 22 }}>
+              {defeatedBossName} a été vaincu. Ton aventure continue.
+            </p>
+
+            <button
+              onClick={continueAfterBossVictory}
+              style={{
+                padding: "12px 20px",
+                borderRadius: 14,
+                border: "none",
+                background: "#7c3aed",
+                color: "white",
+                fontWeight: "bold",
+                cursor: "pointer",
+                fontSize: 16,
+              }}
+            >
+              Continuer
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
